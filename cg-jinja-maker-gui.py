@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import N, E, S, W, END
 from tkinter import messagebox, filedialog
 from random import randint
+from os import system
+from platform import system as platform
 import yaml
 import csv
 import sys
@@ -11,7 +13,9 @@ import re
 import yaml
 from yaml.loader import SafeLoader
 
-common_yml_params = [
+
+##############GLOBALS##############
+common_yml_params = [   ###These are the common YML Keys used for the common params checkbox
     'city',
     'country',
     'post_code',
@@ -21,40 +25,62 @@ common_yml_params = [
 ]
 
 
-class SafeLineLoader(SafeLoader):
-    def construct_mapping(self, node, deep=False):
-        mapping = super(SafeLineLoader, self).construct_mapping(node, deep=deep)
-        # Add 1 so line numbering starts at 1
-        mapping['__line__'] = node.start_mark.line + 1
-        return mapping
+first_site_name = ""
+sites_version = ''
+elements_version = ''
 
-
-yml_file = "/Users/karlschmutz/Documents/PythonDev/ST-TEST.yml"
-
-sites_version = 'sites v4.3'
-elements_version = 'elements v2.3'
 csv_out_dict = {}
-CLIARGS = {}
-yml_input = {}
 
-big_list = []
 change_list = []
-CLIARGS['ignore_nulls'] = False
-CLIARGS['Input YML File'] = yml_file
+list_box_array = []             ###Contains YML File Original Contents
+list_box_array_jinja = []       ###Contains YML File with VALUE replaced with JINJA Variable of YML PATH
+element_name_list = []
+##################################
 def open_yml():
     filename = tk.filedialog.askopenfile(title="Open YML/YAML CloudGenix Config File")
     if (filename):
         alert("OPENED file name: " + str(filename.name) , "File Opened" )
+        yml_file = filename.name
+        global list_box_array, list_box_array_jinja
+        (list_box_array, list_box_array_jinja) = load_yml_file(yml_file)
     else:
         alert("Cancelled File Open", "File Open Cancelled" )
-    yml_file = filename.name
+    
+    
+
 
 def save_jinja():
+
+    new_csv_params = []
+    new_csv_values = []
+    
+
     jinjafilename = tk.filedialog.asksaveasfilename(initialfile="template-jinja.yml",title="Save JINJA template file")
     if (jinjafilename):
-        ymlfilename = tk.filedialog.asksaveasfilename(initialfile="template-params.csv",title="Save CSV Parameters file")
-        if (ymlfilename):
-            alert("Saved file names: " + str(jinjafilename) + " and " + str(ymlfilename), "File Saved" )
+        csvfilename = tk.filedialog.asksaveasfilename(initialfile="template-params.csv",title="Save CSV Parameters file")
+        if (csvfilename):
+            ### Get CSV Params for things which have changed
+            for i in range(len(list_box_array)):
+                if ("{{" in lst_Listbox_data.get(i)) and ("}}" in lst_Listbox_data.get(i)):
+                    key_param = re.sub("}}.*.", "", lst_Listbox_data.get(i))
+                    key_param = re.sub(".*.{{", "", key_param)
+
+                    orig_value = list_box_array[i]['name']
+                    orig_value = re.sub(".*.\: ", "", orig_value)
+                    orig_value = re.sub("\n", "", orig_value)
+                    orig_value = orig_value.replace(":","")
+                    
+                    new_csv_params.append(key_param)
+                    new_csv_values.append(orig_value)   
+            with open(csvfilename, 'w', newline='') as csvoutput: #####WRITE the CSV sample file
+                linewriter = csv.writer(csvoutput, delimiter=',', quotechar='"')
+                linewriter.writerow(new_csv_params)
+                linewriter.writerow(new_csv_values)
+                print(" SUCCESS: Wrote CSV Parameter file",csvfilename)
+            with open(jinjafilename, "w") as jinja_file:
+                for i in range(len(list_box_array)): ###write JINJA Template File
+                    jinja_file.write(lst_Listbox_data.get(i).replace("\n","") + "\n")
+                print(" SUCCESS: Wrote JINJA Parameter file",csvfilename)
         else:
             alert("Cancelled SAVE", "File Save Cancelled" )
     else:
@@ -64,6 +90,18 @@ def save_jinja():
 def alert(alertmessage, title="Notice"):
     tk.messagebox.showinfo(str(title), str(alertmessage))
 
+def sub_window_auth():
+    
+    win1 = tk.Toplevel(bg='red')
+    win1.title('top/child window win1')
+    win1.geometry("300x150+120+120")
+    btn_lift = tk.Button(win1, text="Lift win1")
+    btn_lift.pack(padx=30, pady=5)
+    btn_lower = tk.Button(win1, text="Lower win1")
+    btn_lower.pack(pady=5)
+    win1.lift(aboveThis=win)
+    win1.grab_set()
+
 def alertme():
     if (chk_selectcommon.get() == 1):
         lst_Listbox_data.selection_set(5)
@@ -72,20 +110,28 @@ def alertme():
         lst_Listbox_data.selection_clear(5)
         lst_Listbox_data.selection_clear(6)
 
-
-def select_common_yml_params():
+def select_names():
+    global element_name_list
     select = False
-    if (chk_selectcommon.get() == 1):
+    if (chk_selectnames.get() == 1):
         select = True
-
+    ### SELECT Site Name
     change_list.clear()
-    for i in range(len(big_list)):
-        key_param = big_list[i]['name']
+    match_criteria = " " + first_site_name + ":"
+    for i in range(len(list_box_array)):
+        if match_criteria in list_box_array[i]['name'].replace("'",""):
+            change_list.append(i)
+
+    ### SELECT Element Name
+    for i in range(len(list_box_array)):
+        key_param = list_box_array[i]['name']
         key_param = re.sub(" ", "", key_param)
         key_param = re.sub("\:.*.", "", key_param)
         key_param = re.sub("\n", "", key_param)
-        if key_param.replace(":","") in common_yml_params :
+        key_param = key_param.replace(":","")
+        if  key_param in element_name_list:
             change_list.append(i)
+ 
     for index in change_list:
         if select:
             lst_Listbox_data.selection_set(index)
@@ -93,36 +139,30 @@ def select_common_yml_params():
             lst_Listbox_data.selection_clear(index)
 
 
-    
+def select_common_yml_params():
+    select = False
+    first_state_found = False ###a HACK: Used to only change the first instance of the key "state" as in address, not as in element state: bound
+    if (chk_selectcommon.get() == 1):
+        select = True
 
-def open_files():
-    print("OPENING FILE")
-    print(" USING INPUT FILE:", CLIARGS['Input YML File'])
-    yml_dict = {}
-    with open(CLIARGS['Input YML File'], 'r') as stream:
-        try:
-            print(" Opened file successfully")
-            yml_dict = yaml.safe_load(stream)
-            #yml_dict = yaml.load(stream, Loader=SafeLineLoader)
-            print(" Loaded YML Successfully")        
-        except yaml.YAMLError as exc:
-            sys.exit(exc)
-
-    if(sites_version not in yml_dict.keys()):
-        sys.exit("ERROR: no sites (" + sites_version + ") found in YML input file")
-
-    if len(yml_dict[sites_version]) > 1:
-        print(" WARNING: more than 1 site found. It is recommended that a YML with only 1 site be used")
-    return yml_dict
-
-yml_input = open_files()
-yml_raw_input = open(yml_file, "r")
-
-counter = 0
-for i in yml_raw_input:
-    if (i != '---\n') and (i[0] != '#'):  ###IGNORE Comments and the starting --- Char
-        big_list.append({"name": str(i), "value": False, 'line': counter})
-        counter += 1
+    change_list.clear()
+    for i in range(len(list_box_array)):
+        key_param = list_box_array[i]['name']
+        key_param = re.sub(" ", "", key_param)
+        key_param = re.sub("\:.*.", "", key_param)
+        key_param = re.sub("\n", "", key_param)
+        if key_param.replace(":","") in common_yml_params :
+            if "state" in key_param:
+                if not(first_state_found):
+                    first_state_found = True
+                    change_list.append(i)
+            else:
+                change_list.append(i)
+    for index in change_list:
+        if select:
+            lst_Listbox_data.selection_set(index)
+        else:
+            lst_Listbox_data.selection_clear(index)
 
 def CleanBrackets(item):
     retval = item
@@ -143,7 +183,7 @@ def CleanBrackets(item):
 ### I have added lines needed to populate the CSV Dict and to permit the ignoring of
 ### Null parameters
 def RecursivelyChangeVals(item, path = ""):
-    if ((type(item) == None) or (item is None)) and (CLIARGS['ignore_nulls']):
+    if ((type(item) == None) or (item is None)) and False:
         return ""
     
     elif (isinstance(item, dict)):
@@ -161,20 +201,111 @@ def RecursivelyChangeVals(item, path = ""):
             csv_out_dict[CleanBrackets(path[1:])] = str(item)
         path = CleanBrackets(path)
         return f"{{{{{path[1:]}}}}}" 
-
-def replace_selected(): 
+def revert_selected():
     change_list.clear()
-    for i in range(len(big_list)):
+    for i in range(len(list_box_array)):
         if lst_Listbox_data.selection_includes(i):
             change_list.append(i)
     for index in change_list:
         lst_Listbox_data.delete(index)        
-        lst_Listbox_data.insert(index, replace_big_list[index])
+        lst_Listbox_data.insert(index, list_box_array[index]['name'])
+    if len(change_list) > 0:
+        alert("Successfully reverted " + str(len(change_list)) + " items")
+    else:
+        alert("No items selected to be changed", "Error")
+
+def replace_selected(): 
+    change_list.clear()
+    for i in range(len(list_box_array)):
+        if lst_Listbox_data.selection_includes(i):
+            change_list.append(i)
+    for index in change_list:
+        lst_Listbox_data.delete(index)        
+        lst_Listbox_data.insert(index, list_box_array_jinja[index])
     if len(change_list) > 0:
         alert("Successfully changed " + str(len(change_list)) + " items")
     else:
         alert("No items selected to be changed", "Error")
 
+def load_yml_file(yml_filename):
+    list_box_array = []
+    list_box_array_jinja = []
+    yml_dict = {}
+    global elements_version, sites_version, first_site_name, element_name_list
+    
+    print("OPENING FILE")
+    print(" USING INPUT FILE:", yml_filename)
+    
+    with open(yml_filename, 'r') as stream:
+        try:
+            print(" Opened file successfully")
+            yml_dict = yaml.safe_load(stream)
+            #yml_dict = yaml.load(stream, Loader=SafeLineLoader)
+            print(" Loaded YML Successfully")        
+        except yaml.YAMLError as exc:
+            sys.exit(exc)
+
+    ###Detect Sites Version
+    yml_root_keys = yml_dict.keys()
+    for key in yml_root_keys:
+        if "sites v" in key:
+            sites_version = key
+            print("Detected Sites version in use:",sites_version)
+    
+    first_site_name = next(iter(yml_dict[sites_version]))
+    ###Detect Elements Version
+    yml_site_keys = yml_dict[sites_version][first_site_name].keys()
+    for key in yml_site_keys:
+        if "elements v" in key:
+            elements_version = key
+            print("Detected Elements version in use:",elements_version)
+    if elements_version == "":
+        print("Warning, no Elements detected in YML")
+        
+    element_name_list = list(yml_dict[sites_version][first_site_name][elements_version].keys())
+
+    if(sites_version == ""):
+        sys.exit("ERROR: no sites version found in YML input file(Is this a CGX YML FILE?)")
+
+    if len(yml_dict[sites_version]) > 1:
+        print(" WARNING: more than 1 site found. It is recommended that a YML with only 1 site be used")
+
+    ###Replace Site Name with placeholder: site_1
+    yml_dict[sites_version]["{{ site_1 }}"] = yml_dict[sites_version].pop(first_site_name)
+
+    ###Replace ELEMENT Name with placeholder: element_1
+    if (len(element_name_list) > 0):
+        counter = 0
+        for element in element_name_list:
+            counter += 1
+            new_element_name = "{{ element_" + str(counter) + " }}"
+            yml_dict[sites_version]["{{ site_1 }}"][elements_version][new_element_name] = yml_dict[sites_version]["{{ site_1 }}"][elements_version].pop(element)
+
+    
+
+    yml_raw_input = open(yml_filename, "r")
+
+    counter = 0
+    for i in yml_raw_input:
+        if (i != '---\n') and (i[0] != '#'):  ###IGNORE Comments and the starting --- Char
+            list_box_array.append({"name": str(i), "value": False, 'line': counter})
+            counter += 1
+
+    for i in list_box_array:
+        lst_Listbox_data.insert(END, str(i['name']))
+
+    RecursivelyChangeVals(yml_dict)
+    replaced_yml = yaml.dump(yml_dict, sort_keys=False)
+    
+    for i in replaced_yml.split('\n'):
+        list_box_array_jinja.append(i)
+
+    return(list_box_array, list_box_array_jinja)
+
+
+################################################
+##############   BUILD the GUI  ################
+################################################
 win = tk.Tk()
 
 chk_selectcommon = tk.IntVar()
@@ -184,7 +315,6 @@ chk_selectwaninterfaces = tk.IntVar()
 win.title('Jinja TOOL')
 win.geometry('900x700') # Size 200, 200
 
-
 input_frame = tk.Frame(win)
 options_frame = tk.Frame(win, bd="2", highlightbackground="black", highlightthickness=1)
 operation_frame = tk.Frame(win)
@@ -192,20 +322,20 @@ output_frame = tk.Frame(win)
 
 lbl_api = tk.Label(input_frame, text=" ")
 btn_openfile = tk.Button(input_frame, text='Select YML File to OPEN', command=open_yml)
+btn_openapi = tk.Button(input_frame, text='Load YML via API', command=sub_window_auth)
 
 btn_convert = tk.Button(output_frame, text='Convert to JINJA', command=replace_selected)
+btn_revert = tk.Button(output_frame, text='Revert Selection to YAML', command=revert_selected)
 btn_save = tk.Button(output_frame, text='Save JINJA and CSV Parameters File', command=save_jinja)
 
 lst_Listbox_data = tk.Listbox(operation_frame, selectmode=tk.MULTIPLE)
 scrollbar = tk.Scrollbar(operation_frame)
 lst_Listbox_data.config(yscrollcommand=scrollbar.set)
 scrollbar.config(command=lst_Listbox_data.yview)
-for i in big_list:
-    lst_Listbox_data.insert(END, str(i['name']))
-
 
 input_frame.pack( fill="both")
 btn_openfile.pack(side="left", fill="both")
+btn_openapi.pack(side="right", fill="both")
 lbl_api.pack(side="right", fill="both")
 
 options_frame.pack(fill="both")
@@ -213,9 +343,9 @@ lbl_labelcheckdescription = tk.Label(options_frame, text="Optional Settings: ")
 lbl_labelcheckdescription.pack(side="left", fill="y")
 chk_chkselectcommon = tk.Checkbutton(options_frame, text='Common Parameters', command=select_common_yml_params, variable=chk_selectcommon) 
 chk_chkselectcommon.pack(side="left", fill="y", padx=15)
-chk_chkselectnames = tk.Checkbutton(options_frame, text='Site/Element Names', command=alertme, variable=chk_selectnames) 
+chk_chkselectnames = tk.Checkbutton(options_frame, text='Site/Element Names', command=select_names, variable=chk_selectnames) 
 chk_chkselectnames.pack(side="left", fill="y", padx=15)
-chk_chkselectwaninterfaces = tk.Checkbutton(options_frame, text='WAN Interfaces', command=alertme, variable=chk_selectwaninterfaces) 
+chk_chkselectwaninterfaces = tk.Checkbutton(options_frame, text='WAN Interfaces', command=sub_window_auth, variable=chk_selectwaninterfaces) 
 chk_chkselectwaninterfaces.pack(side="left", fill="y", padx=15)
 
 operation_frame.pack(expand=1, fill="both")
@@ -224,16 +354,12 @@ lst_Listbox_data.pack(expand=1, fill="both", side="left")
 
 output_frame.pack(fill="both")
 btn_convert.pack(side="left",)
+btn_revert.pack(side="left",)
 btn_save.pack(side="right")
-
 
 win.focus_set()
 
-RecursivelyChangeVals(yml_input)
-replaced_yml = yaml.dump(yml_input, sort_keys=False)
-
-replace_big_list = []
-for i in replaced_yml.split('\n'):
-    replace_big_list.append(i)
+if platform() == 'Darwin':  # How Mac OS X is identified by Python
+    system('''/usr/bin/osascript -e 'tell app "Finder" to set frontmost of process "Python" to true' ''')
 
 tk.mainloop()

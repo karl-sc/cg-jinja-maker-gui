@@ -12,7 +12,9 @@ import re
 
 import yaml
 from yaml.loader import SafeLoader
+from cloudgenix import API
 
+sdk = API()
 
 ##############GLOBALS##############
 common_yml_params = [   ###These are the common YML Keys used for the common params checkbox
@@ -23,7 +25,6 @@ common_yml_params = [   ###These are the common YML Keys used for the common par
     'street',
     'street2',
 ]
-
 
 first_site_name = ""
 sites_version = ''
@@ -36,6 +37,7 @@ list_box_array = []             ###Contains YML File Original Contents
 list_box_array_jinja = []       ###Contains YML File with VALUE replaced with JINJA Variable of YML PATH
 element_name_list = []
 ##################################
+
 def open_yml():
     filename = tk.filedialog.askopenfile(title="Open YML/YAML CloudGenix Config File")
     if (filename):
@@ -45,15 +47,10 @@ def open_yml():
         (list_box_array, list_box_array_jinja) = load_yml_file(yml_file)
     else:
         alert("Cancelled File Open", "File Open Cancelled" )
-    
-    
-
 
 def save_jinja():
-
     new_csv_params = []
     new_csv_values = []
-    
 
     jinjafilename = tk.filedialog.asksaveasfilename(initialfile="template-jinja.yml",title="Save JINJA template file")
     if (jinjafilename):
@@ -66,9 +63,11 @@ def save_jinja():
                     key_param = re.sub(".*.{{", "", key_param)
 
                     orig_value = list_box_array[i]['name']
+                    orig_value = re.sub(".*.\- ", "", orig_value)
                     orig_value = re.sub(".*.\: ", "", orig_value)
                     orig_value = re.sub("\n", "", orig_value)
                     orig_value = orig_value.replace(":","")
+                    orig_value = re.sub("^ *", "", orig_value)
                     
                     new_csv_params.append(key_param)
                     new_csv_values.append(orig_value)   
@@ -90,10 +89,17 @@ def save_jinja():
 def alert(alertmessage, title="Notice"):
     tk.messagebox.showinfo(str(title), str(alertmessage))
 
-def sub_window_auth():
+def open_api():
+    import cloudgenix_config
+    from cloudgenix_config import pull
+    global sdk
+    token = 'testtoken'
+    seattle_siteid = "15003264513650067"
+    sdk.interactive.use_token(token)
+    result_dict = pull.pull_config_sites(seattle_siteid, output_filename=None, passed_sdk=sdk, return_result=True)
     
-    win1 = tk.Toplevel(bg='red')
-    win1.title('top/child window win1')
+    win_auth = tk.Toplevel()
+    win1.title('Please Authenticate via API')
     win1.geometry("300x150+120+120")
     btn_lift = tk.Button(win1, text="Lift win1")
     btn_lift.pack(padx=30, pady=5)
@@ -105,7 +111,7 @@ def sub_window_auth():
 def alertme():
     if (chk_selectcommon.get() == 1):
         lst_Listbox_data.selection_set(5)
-        lst_Listbox_data.selection_set(6)
+        lst_Listbox_data.selection_set(6)   
     else:
         lst_Listbox_data.selection_clear(5)
         lst_Listbox_data.selection_clear(6)
@@ -322,7 +328,7 @@ output_frame = tk.Frame(win)
 
 lbl_api = tk.Label(input_frame, text=" ")
 btn_openfile = tk.Button(input_frame, text='Select YML File to OPEN', command=open_yml)
-btn_openapi = tk.Button(input_frame, text='Load YML via API', command=sub_window_auth)
+btn_openapi = tk.Button(input_frame, text='Load YML via API', command=open_api, state="disabled")
 
 btn_convert = tk.Button(output_frame, text='Convert to JINJA', command=replace_selected)
 btn_revert = tk.Button(output_frame, text='Revert Selection to YAML', command=revert_selected)
@@ -345,7 +351,7 @@ chk_chkselectcommon = tk.Checkbutton(options_frame, text='Common Parameters', co
 chk_chkselectcommon.pack(side="left", fill="y", padx=15)
 chk_chkselectnames = tk.Checkbutton(options_frame, text='Site/Element Names', command=select_names, variable=chk_selectnames) 
 chk_chkselectnames.pack(side="left", fill="y", padx=15)
-chk_chkselectwaninterfaces = tk.Checkbutton(options_frame, text='WAN Interfaces', command=sub_window_auth, variable=chk_selectwaninterfaces) 
+chk_chkselectwaninterfaces = tk.Checkbutton(options_frame, text='WAN Interfaces', command=select_names, variable=chk_selectwaninterfaces) 
 chk_chkselectwaninterfaces.pack(side="left", fill="y", padx=15)
 
 operation_frame.pack(expand=1, fill="both")

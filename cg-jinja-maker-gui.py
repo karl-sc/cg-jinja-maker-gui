@@ -155,14 +155,14 @@ def open_api():
 
     txt_username = tk.StringVar(win_api_auth, value='<username>')
     input_box_username = tk.Entry(win_api_auth, textvariable=txt_username,state="disabled")
-    input_box_username.pack()
+    input_box_username.pack(fill="both")
 
     lbl_3 = tk.Label(win_api_auth, text="Password" )
-    lbl_3.pack()
+    lbl_3.pack(fill="both")
 
     txt_password = tk.StringVar(win_api_auth, value='********')
     input_box_password = tk.Entry(win_api_auth, textvariable=txt_password, show="*",state="disabled")
-    input_box_password.pack()
+    input_box_password.pack(fill="both")
     
     btn_ok = tk.Button(win_api_auth, text="OK")
     btn_cancel = tk.Button(win_api_auth, text="CANCEL", command=lambda: subwindow_cancel(win_api_auth))
@@ -174,8 +174,6 @@ def open_api():
     radio2.config(command=lambda: choose_new_auth_method( [input_box_username,input_box_password], [input_box_token] ))
     btn_ok.config(command=lambda: auth_and_pick_sites(auth_method.get(),txt_username.get(),txt_password.get(),txt_auth_token.get(),win_api_auth))
     auth_method.set(1)
-    radio1.set(1)
-    radio1.invoke()
     
     win_api_auth.lift(aboveThis=win_jinjatool_main)
     win_api_auth.grab_set()
@@ -756,6 +754,125 @@ def csvparmtool_toggle_opts(w):
     else:
         w.grid()
 
+def launch_dosite_tool():
+    win_dosite_tool_main = tk.Toplevel()
+    win_dosite_tool_main.title("Do SITE - YML CONFIGURATION Pusher")
+    global dosite_file
+    
+    dosite_file = tk.StringVar()
+   
+    json_header_frame = tk.Frame(win_dosite_tool_main)
+    path_entry_frame = tk.Frame(win_dosite_tool_main)
+    process_exit = tk.Frame(win_dosite_tool_main)
+   
+    tk.Label(json_header_frame, text="Choose a YML File to Upload").grid(row=0, column=0, sticky=W)
+    json_header_frame.grid(row=0, column=0, pady=12, padx=20)
+
+    # add CSV data file entry
+    data_label = tk.Label(path_entry_frame, text="YML File:")
+    data_label.grid(row=1, column=0, sticky=W)
+    datafile_entry = tk.Entry(path_entry_frame, textvariable=dosite_file, width=65)
+    datafile_entry.grid(row=1, column=1)
+    browse_csv_button = tk.Button(path_entry_frame, text="Browse", command=dosite_file_get)
+    browse_csv_button.grid(row=1, column=2)
+    
+    path_entry_frame.grid(row=10, column=0, pady=12, padx=20)
+
+    
+    # add process/exit
+    tk.Button(process_exit, text="Process", command=win_csvparmtool_process).grid(row=0, column=0, padx=2)
+    tk.Button(process_exit, text="Exit", command=lambda: kill_windows(win_dosite_tool_main)).grid(row=0, column=2, padx=2)
+    process_exit.grid(row=20, column=0,  pady=12)
+
+    win_dosite_tool_main.lift(aboveThis=win_launchermain)
+    win_dosite_tool_main.grab_set()
+def dosite_file_get():
+    global dosite_file
+    filename = tk.filedialog.askopenfile(title="Open YML Site Config File")
+    if (filename):
+        #alert("OPENED file name: " + str(filename.name) , "File Opened" )
+        dosite_file.set(filename.name)
+    else:
+        alert("Cancelled File Open", "File Open Cancelled" )
+
+def win_csvparmtool_process(w):
+    global dosite_file, sdk
+    do_site_filename = dosite_file.get().strip()
+
+    if not sdk.tenant_id: ###If we arent logged in:   
+        print("Not Currently Logged in, attemptin Auth for do_site on file:",do_site_filename)
+        
+        win_api_auth = tk.Toplevel()
+        win_api_auth.title('Please Authenticate via API')
+        
+        auth_method = tk.IntVar(None, 1)
+
+        radio1 = tk.Radiobutton(win_api_auth, text="Auth Token", variable=auth_method, value=1)
+        radio1.pack(anchor=W)
+        lbl_0 = tk.Label(win_api_auth, text="Auth Token Authentication:" )
+        lbl_0.pack()
+        
+        txt_auth_token = tk.StringVar(win_api_auth, value='... Please paste your Auth Token Here ...')
+        input_box_token = tk.Entry(win_api_auth, textvariable=txt_auth_token, width=40)
+        input_box_token.pack()
+
+        radio2 = tk.Radiobutton(win_api_auth, text="User/Pass", variable=auth_method, value=2)
+        radio2.pack(anchor=W)
+
+        lbl_1 = tk.Label(win_api_auth, text="Username/PW Auth:" )
+        lbl_1.pack()
+
+        lbl_2 = tk.Label(win_api_auth, text="Email/User" )
+        lbl_2.pack()
+
+        txt_username = tk.StringVar(win_api_auth, value='<username>')
+        input_box_username = tk.Entry(win_api_auth, textvariable=txt_username,state="disabled")
+        input_box_username.pack(fill="both")
+
+        lbl_3 = tk.Label(win_api_auth, text="Password" )
+        lbl_3.pack(fill="both")
+
+        txt_password = tk.StringVar(win_api_auth, value='********')
+        input_box_password = tk.Entry(win_api_auth, textvariable=txt_password, show="*",state="disabled")
+        input_box_password.pack(fill="both")
+        
+        btn_ok = tk.Button(win_api_auth, text="OK")
+        btn_cancel = tk.Button(win_api_auth, text="CANCEL", command=lambda: subwindow_cancel(win_api_auth))
+
+        btn_cancel.pack(side="right",expand=1, pady=5, padx=10)
+        btn_ok.pack(side="left",expand=1, pady=5)
+        
+        radio1.config(command=lambda: choose_new_auth_method([input_box_token],[input_box_username,input_box_password]))
+        radio2.config(command=lambda: choose_new_auth_method( [input_box_username,input_box_password], [input_box_token] ))
+        btn_ok.config(command=lambda: process_dosite(auth_method.get(),txt_username.get(),txt_password.get(),txt_auth_token.get(),win_api_auth,do_site_filename))
+        auth_method.set(1)
+        
+        win_api_auth.lift(aboveThis=w)
+        win_api_auth.grab_set()
+    else: ###We are already logged in
+        exec_do_site(sdk, do_site_filename)
+
+def process_dosite(auth_method, username, password, auth_token, parent_window,do_site_filename):
+    global sdk
+    
+    if (auth_method == 1): ###API TOKEN AUTH
+        try: auth_status = sdk.interactive.use_token(auth_token)
+        except: auth_status = False
+    else:
+        auth_status = sdk.interactive.login(email=username,password=password)
+        try: auth_status
+        except: auth_status = False
+    if auth_status:
+        exec_do_site(do_site_filename)
+    else:
+        alert("auth failed", "auth failed")
+def exec_do_site(do_site_filename):
+    global sdk
+    from cloudgenix_config import do
+    loaded_config = {} #of YML
+    do.do_site(loaded_config, destroy=False, passed_sdk=sdk, )
+
+
 def launch_jinjatool():
     global win_jinjatool_main, chk_selectcommon, chk_selectnames, chk_selectpolicybindings
     global chk_selectinterfaces
@@ -838,7 +955,7 @@ btn_csvmerge = tk.Button(frame_opt2, text="2. JINJA CSV Params Merge Tool", heig
 lbl_desc_opt2 = tk.Label(frame_opt2, wraplength=Main_window_width*9,justify='left',text="Use this tool to combine a JINJA Template and CSV Parameters file into resulting YML Branch site files",  borderwidth=2, relief="ridge")
 
 frame_opt3 = tk.Frame(height=1, bd=2, relief="sunken")
-btn_dosite = tk.Button(frame_opt3, text="3. YML 'do_site' upload tool", height=Main_window_height, width=Main_window_width,highlightthickness = 0, bd = 0, )
+btn_dosite = tk.Button(frame_opt3, text="3. YML 'do_site' upload tool", height=Main_window_height, width=Main_window_width,highlightthickness = 0, bd = 0,command=launch_dosite_tool )
 lbl_desc_opt3 = tk.Label(frame_opt3, wraplength=Main_window_width*9,justify='left',text="Use this tool to upload a YML Site file to CloudGenix",  borderwidth=2, relief="ridge")
 
 btn_jinja_tool.pack (expand=1, pady=5,  fill="both")

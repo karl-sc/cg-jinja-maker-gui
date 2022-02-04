@@ -663,7 +663,10 @@ def csvjinja_process():
     # the Jinja2 template file
     template_file = template_jinja_var.get()
     print("Create Jinja2 environment...")
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath="/"))
+    if platform() == 'Windows':  # How Windows is identified by Python - Needed for Windows (non-posix) environments
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath="C:/"))
+    else:
+        env = jinja2.Environment(loader=jinja2.FileSystemLoader(searchpath="/"))
     template = env.get_template(template_file)
 
     # we will make sure that the output directory exists
@@ -790,12 +793,12 @@ def dosite_file_get():
     global dosite_file
     filename = tk.filedialog.askopenfile(title="Open YML Site Config File")
     if (filename):
-        #alert("OPENED file name: " + str(filename.name) , "File Opened" )
+        alert("OPENED file name: " + str(filename.name) , "File Opened" )
         dosite_file.set(filename.name)
     else:
         alert("Cancelled File Open", "File Open Cancelled" )
 
-def win_csvparmtool_process(w):
+def win_csvparmtool_process():
     global dosite_file, sdk
     do_site_filename = dosite_file.get().strip()
 
@@ -847,14 +850,13 @@ def win_csvparmtool_process(w):
         btn_ok.config(command=lambda: process_dosite(auth_method.get(),txt_username.get(),txt_password.get(),txt_auth_token.get(),win_api_auth,do_site_filename))
         auth_method.set(1)
         
-        win_api_auth.lift(aboveThis=w)
+        #win_api_auth.lift(aboveThis=win_dosite_tool_main)
         win_api_auth.grab_set()
     else: ###We are already logged in
         exec_do_site(sdk, do_site_filename)
 
 def process_dosite(auth_method, username, password, auth_token, parent_window,do_site_filename):
     global sdk
-    
     if (auth_method == 1): ###API TOKEN AUTH
         try: auth_status = sdk.interactive.use_token(auth_token)
         except: auth_status = False
@@ -869,9 +871,17 @@ def process_dosite(auth_method, username, password, auth_token, parent_window,do
 def exec_do_site(do_site_filename):
     global sdk
     from cloudgenix_config import do
-    loaded_config = {} #of YML
-    do.do_site(loaded_config, destroy=False, passed_sdk=sdk, )
-
+    with open(do_site_filename, 'r') as stream:
+        try:
+            print(" Opened DO_SITE file successfully")
+            yml_dict = yaml.safe_load(stream)
+            print(" Loaded YML Successfully")        
+            loaded_config = yml_dict #of YML
+            do.do_site(loaded_config, destroy=False, passed_sdk=sdk, )
+            alert("Success", "Pushed Site Successfully")
+        except yaml.YAMLError as exc:
+            alert("Error", "Issue with do_site. Please check console for error messages")
+            sys.exit(exc)
 
 def launch_jinjatool():
     global win_jinjatool_main, chk_selectcommon, chk_selectnames, chk_selectpolicybindings
